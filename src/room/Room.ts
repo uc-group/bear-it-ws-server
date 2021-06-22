@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
-import Client from '../client/Client';
-import User from '../client/User';
+import type Client from '../client/Client';
+import type User from '../client/User';
 import System from '../systems/System';
 
 type UserListener = (user: User) => void;
@@ -8,32 +8,32 @@ type UserListener = (user: User) => void;
 type Listeners = {
   newUserJoined: UserListener,
   userLeft: UserListener
-}
+};
 
 type RoomListeners = {
   newUserJoined: UserListener[],
   userLeft: UserListener[]
-}
-
-type ListenerNames = keyof Listeners;
+};
 
 export default class Room {
   private clients: Client[] = []
+  ;
+
   private systems: System<any, any>[] = [];
+
   private listeners: RoomListeners = {
     newUserJoined: [],
-    userLeft: []
-  }
+    userLeft: [],
+  };
 
   constructor(
     public id: string,
-    private io: Server
+    private io: Server,
   ) {}
 
-  public async addClient(client: Client): Promise<Record<string, any>>
-  {
+  public async addClient(client: Client): Promise<Record<string, any>> {
     if (this.isClientInRoom(client)) {
-      return;
+      return {};
     }
 
     const usersBeforeJoin = this.getUsers();
@@ -41,17 +41,17 @@ export default class Room {
     client.socket.join(this.id);
     this.clients.push(client);
 
-    if (usersBeforeJoin.length != this.getUsers().length) {
+    if (usersBeforeJoin.length !== this.getUsers().length) {
       this.listeners.newUserJoined.forEach((listener) => listener(client.user));
     }
 
-    const keys = this.systems.map((system) => system.id())
+    const keys = this.systems.map((system) => system.id());
     const promisses = this.systems.map((system) => system.onClientJoined(this, client));
     const values = await Promise.all(promisses);
-    const result = {};
+    const result: Record<string, any> = {};
     keys.forEach((key, index) => {
       result[key] = values[index];
-    })
+    });
 
     this.systems.forEach((system) => {
       system.getEvents(this, client).forEach((event) => {
@@ -64,18 +64,22 @@ export default class Room {
     return result;
   }
 
-  public attachSystem<J, L>(system: System<J, L>) {
+  public async attachSystem<J, L>(system: System<J, L>) {
     this.systems.push(system);
-    system.onAttach(this);
+    await system.onAttach(this);
     this.clients.forEach((client) => {
       system.onClientJoined(this, client);
-    })
+    });
   }
 
   public async removeClient(client: Client): Promise<Record<string, any>> {
+    if (!this.isClientInRoom(client)) {
+      return {};
+    }
+
     this.systems.forEach((system) => {
       system.getEvents(this, client).forEach((event) => {
-        client.socket.off(`${this.id}/${event.name}`, event.handler);
+        client.socket.removeAllListeners(`${this.id}/${event.name}`);
       });
     });
 
@@ -84,18 +88,18 @@ export default class Room {
     this.clients = this.clients.filter((c) => c.socket.id !== client.socket.id);
     client.socket.leave(this.id);
 
-    if (usersBeforeLeave.length != this.getUsers().length) {
+    if (usersBeforeLeave.length !== this.getUsers().length) {
       this.listeners.userLeft.forEach((listener) => listener(client.user));
     }
 
-    const keys = this.systems.map((system) => system.id())
+    const keys = this.systems.map((system) => system.id());
     const promisses = this.systems.map((system) => system.onClientLeft(this, client));
     const values = await Promise.all(promisses);
-    const result = {};
+    const result: Record<string, any> = {};
     keys.forEach((key, index) => {
       result[key] = values[index];
-    })
-    
+    });
+
     console.log(`Client ${client.socket.id} left room ${this.id}`);
 
     return result;
@@ -117,17 +121,15 @@ export default class Room {
     return users;
   }
 
-  public getUserIds(): string[]
-  {
+  public getUserIds(): string[] {
     return this.getUsers().map((user) => user.id);
   }
 
-  public emit(eventName: string, ...args) {
+  public emit<T extends any[]>(eventName: string, ...args: T) {
     this.io.to(this.id).emit(`${this.id}/${eventName}`, ...args);
   }
 
-  public addListener<T extends keyof Listeners>(name: T , listener: Listeners[T])
-  {
-      this.listeners[name].push(listener)
+  public addListener<T extends keyof Listeners>(name: T, listener: Listeners[T]) {
+    this.listeners[name].push(listener);
   }
 }

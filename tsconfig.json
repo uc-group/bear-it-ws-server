@@ -2,15 +2,17 @@
   "compilerOptions": {
     "module": "commonjs",
     "removeComments": true,
-    "sourceMap": true,
-    "target": "es5",
-    "outDir": "build"
+    "strict": true,
+    "target": "esnext",
+    "outDir": "build",
+    "noImplicitAny": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
   ]
 }

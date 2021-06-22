@@ -11,44 +11,43 @@ interface RoomMessage {
 
 export default class Server {
   private rooms: Room[] = [];
+
   private started: boolean = false;
+
   private clients: Record<string, Client> = {};
+
   private systems: System<any, any>[] = [];
 
   constructor(
     private io: SocketIoServer,
-    private auth: Auth
+    private auth: Auth,
   ) {}
 
-  public registerSystem<J,L>(system: System<J, L>) {
+  public async registerSystem<J, L>(system: System<J, L>) {
     this.systems.push(system);
-    this.rooms.forEach((room) => {
-      if (system.supportsRoom(room)) {
-        room.attachSystem(system);
-      }
-    })
+    await Promise.all(
+      this.rooms.filter((room) => system.supportsRoom(room))
+        .map((room) => room.attachSystem(system)),
+    );
   }
 
-  public getRoom(id: string) {
-    let room = this.rooms.find((r) => r.id === id);
+  public async getRoom(id: string) {
+    const room = this.rooms.find((r) => r.id === id);
     if (!room) {
-      console.log(`Room ${id} not found. Creating.`)
-      room = new Room(id, this.io);
-      this.systems.forEach((system) => {
-        if (system.supportsRoom(room)) {
-          room.attachSystem(system)
-          console.log(`System ${system.id()} attached to room ${id}`);
-        }
-      });
+      console.log(`Room ${id} not found. Creating.`);
+      const newRoom = new Room(id, this.io);
+      const supportedSystems = this.systems.filter((system) => system.supportsRoom(newRoom));
+      await Promise.all(supportedSystems.map((system) => newRoom.attachSystem(system)));
+      console.log(`System ${supportedSystems.map((system) => system.id()).join(', ')} attached to room ${id}`);
 
-      this.rooms.push(room);
+      this.rooms.push(newRoom);
+      return newRoom;
     }
 
     return room;
   }
 
-  public start(): void
-  {
+  public start(): void {
     if (this.started) {
       throw new Error('Server already started');
     }
@@ -66,11 +65,11 @@ export default class Server {
         const client = this.clients[socket.id];
 
         if (client) {
-          await Promise.all(this.rooms.map((room) => client.leaveRoom(room)));
+          await Promise.all(this.rooms.map((room) => room.removeClient(client)));
           client.destroy();
           delete this.clients[socket.id];
         }
-        
+
         console.log(`Client ${socket.id} disconnected`);
       });
 
@@ -85,23 +84,25 @@ export default class Server {
         return;
       }
 
-      socket.on('join-room', async ({roomId}: RoomMessage, callback) => {
+      socket.on('join-room', async ({ roomId }: RoomMessage, callback) => {
         const client = this.clients[socket.id];
-        const response = await client.joinRoom(this.getRoom(roomId));
+        const room = await this.getRoom(roomId);
+        const response = await room.addClient(client);
         if (typeof callback === 'function') {
           callback(response);
         }
-      })
+      });
 
-      socket.on('leave-room', async ({roomId}: RoomMessage, callback) => {
+      socket.on('leave-room', async ({ roomId }: RoomMessage, callback) => {
         const client = this.clients[socket.id];
-        const response = client.leaveRoom(this.getRoom(roomId));
+        const room = await this.getRoom(roomId);
+        const response = await room.removeClient(client);
         if (typeof callback === 'function') {
           callback(response);
         }
-      })
+      });
 
       socket.emit('connection-ready');
-    })
+    });
   }
 }

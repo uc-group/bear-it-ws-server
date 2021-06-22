@@ -1,12 +1,12 @@
-import { Server } from 'socket.io';
-import Client from '../client/Client';
-import User from '../client/User';
-import Room from '../room/Room';
-import System, { SystemEvent } from './System';
+import { debounce } from 'lodash';
+import type Client from '../client/Client';
+import type Room from '../room/Room';
+import System from './System';
+import * as Api from '../Api';
 
 interface JoinResponse {
   users: string[],
-  messages: string[]
+  messages: ChatMessage[]
 }
 
 interface MessageMessage {
@@ -14,45 +14,96 @@ interface MessageMessage {
   id: string
 }
 
-export default class Chat implements System<JoinResponse, void>
-{
+interface ChatMessage {
+  id: string,
+  date: number,
+  content: string,
+  author: string,
+  room: string,
+}
+
+export default class Chat implements System<JoinResponse, void> {
+  private messages: Record<string, ChatMessage[]> = {};
+
+  private messageQueue: ChatMessage[] = [];
+
+  constructor(private apiUrl: string) {}
+
   getEvents(room: Room, client: Client) {
     return [
       {
         name: 'message',
-        handler: ({content, id}: MessageMessage) => {
-          const user = client.user.id
+        handler: ({ content, id }: MessageMessage) => {
+          const author = client.user.id;
           const date = Date.now();
-          room.emit('message', { content, id, user, date })
-        }
-      }
+          const message = {
+            content, id, author, date, room: room.id,
+          } as ChatMessage;
+
+          this.messages[room.id].push(message);
+          this.saveMessage(message);
+          room.emit<[ChatMessage]>('message', message);
+        },
+      },
     ];
   }
 
-  onAttach(room: Room): void {
-    room.addListener('newUserJoined', (user: User) => {
-      room.emit('user-list', room.getUserIds())
+  async onAttach(room: Room): Promise<void> {
+    room.addListener('newUserJoined', () => {
+      room.emit('user-list', room.getUserIds());
     });
-    room.addListener('userLeft', (user: User) => {
-      room.emit('user-list', room.getUserIds())
+    room.addListener('userLeft', () => {
+      room.emit('user-list', room.getUserIds());
     });
+
+    this.loadMessages(room);
   }
 
+  // eslint-disable-next-line class-methods-use-this
   id(): string {
     return 'chat';
   }
 
+  // eslint-disable-next-line class-methods-use-this
   supportsRoom(room: Room): boolean {
-    return /^chat\//.test(room.id)
+    return /^chat\//.test(room.id);
   }
 
-  async onClientJoined(room: Room, client: Client): Promise<JoinResponse> {
+  async onClientJoined(room: Room): Promise<JoinResponse> {
     return {
       users: room.getUserIds(),
-      messages: []
+      messages: this.messages[room.id] || [],
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function, class-methods-use-this
+  async onClientLeft(): Promise<void> {}
+
+  private async loadMessages(room: Room) {
+    try {
+      this.messages[room.id] = await Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${room.id}`) || [];
+    } catch (e) {
+      this.messages[room.id] = [];
     }
   }
 
-  async onClientLeft(room: Room, client: Client): Promise<void> {}
-  
+  private saveMessage(message: ChatMessage) {
+    this.messageQueue.push(message);
+    this.flushQueue();
+  }
+
+  private flushQueue = debounce(async () => {
+    const data = JSON.parse(JSON.stringify(this.messageQueue)) as ChatMessage[];
+    this.messageQueue = [];
+
+    if (data.length === 0) {
+      return;
+    }
+
+    try {
+      await Api.post(`${this.apiUrl}/chat/messages`, data);
+    } catch (e) {
+      this.messageQueue = [...data, ...this.messageQueue];
+    }
+  }, 1000);
 }

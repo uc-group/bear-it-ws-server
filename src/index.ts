@@ -9,12 +9,12 @@ const httpServer = createServer();
 const io = new SocketIoServer(httpServer, {
   cors: {
     origin: 'http://localhost',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 const server = new Server(io, new SimpleAuth('http://localhost'));
-server.registerSystem(new Chat())
+server.registerSystem(new Chat('http://localhost/api'));
 
 server.start();
 

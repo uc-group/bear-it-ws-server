@@ -1,5 +1,5 @@
-import Client from '../client/Client';
-import Room from '../room/Room';
+import type Client from '../client/Client';
+import type Room from '../room/Room';
 
 export interface SystemEvent<T extends [...any]> {
   name: string,
@@ -9,7 +9,7 @@ export interface SystemEvent<T extends [...any]> {
 export default interface System<JoinResponse = void, LeaveResponse = void> {
   id(): string
   supportsRoom(room: Room): boolean
-  onAttach(room: Room): void
+  onAttach(room: Room): Promise<void>
   onClientJoined(room: Room, client: Client): Promise<JoinResponse>
   onClientLeft(room: Room, client: Client): Promise<LeaveResponse>
   getEvents(room: Room, client: Client): SystemEvent<any>[]
