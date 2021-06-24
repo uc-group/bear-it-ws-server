@@ -4,7 +4,7 @@ const webpackNodeExternals = require('webpack-node-externals')
 
 module.exports = {
   target: 'node',
-  mode: 'development',
+  mode: 'production',
   entry: {
     server: './src/index.ts'
   },
@@ -19,7 +19,7 @@ module.exports = {
     __dirname: false,
     __filename: false
   },
-  externals: [webpackNodeExternals()],
+  externals: [webpackNodeExternals(), './config.js'],
   module: {
     rules: [
       {

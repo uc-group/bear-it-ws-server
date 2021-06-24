@@ -16,7 +16,7 @@ interface MessageMessage {
 
 interface ChatMessage {
   id: string,
-  date: number,
+  postedAt: number,
   content: string,
   author: string,
   room: string,
@@ -35,9 +35,9 @@ export default class Chat implements System<JoinResponse, void> {
         name: 'message',
         handler: ({ content, id }: MessageMessage) => {
           const author = client.user.id;
-          const date = Date.now();
+          const postedAt = Date.now();
           const message = {
-            content, id, author, date, room: room.id,
+            content, id, author, postedAt, room: room.id,
           } as ChatMessage;
 
           this.messages[room.id].push(message);
@@ -56,7 +56,7 @@ export default class Chat implements System<JoinResponse, void> {
       room.emit('user-list', room.getUserIds());
     });
 
-    this.loadMessages(room);
+    await this.loadMessages(room);
   }
 
   // eslint-disable-next-line class-methods-use-this
