@@ -100,3 +100,11 @@ socket.emit('join-room', { roomId: 'my-room' }, (state) {
 }
 */
 ```
+
+Emitting room system message from socket.io client
+
+```js
+const roomName = 'my-room';
+const systemEvent = 'some-event';
+socket.emit(`${roomName}/${systemEvent}`);
+```
