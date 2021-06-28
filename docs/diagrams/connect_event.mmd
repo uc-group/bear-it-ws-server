@@ -1,0 +1,39 @@
+sequenceDiagram
+
+  participant U as Socket.io User
+  participant WS as BearIT WS server
+  participant S as Client socket
+  participant WSC as Internal Client
+  participant B as BearIT API
+
+  U ->> B: request Token
+  activate B
+  B -->> U: returns Token 'thetoken'
+  deactivate B
+
+  U ->> WS: http://ws.bear.it?token=thetoken
+  activate WS
+  WS --) S: register 'disconnect' listener
+  
+  alt token invalid
+    WS ->> B: validate token
+    activate B
+    B -->> WS: 404 response
+    deactivate B
+    Note right of WS: 404 response
+    WS ->> S: disconnect
+  else token valid
+    WS ->> B: validate token
+    activate B
+    B -->> WS: token valid
+    deactivate B
+    Note right of WS: Response data with<br>username and user id
+    WS -->> +WSC: <<create>> new instance
+    WS -) S: register 'join-room' listener
+    WS -) S: register 'leave-room' listener
+    deactivate WSC
+  end
+  
+    WS -) S: emit 'connection-ready'
+    S --) U: emits 'connection-ready'
+  deactivate WS

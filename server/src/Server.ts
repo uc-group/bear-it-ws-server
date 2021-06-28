@@ -9,6 +9,8 @@ interface RoomMessage {
   roomId: string
 }
 
+type RoomMessageCallback = (systemsData: Record<string, any>) => void;
+
 export default class Server {
   private rooms: Room[] = [];
 
@@ -21,7 +23,7 @@ export default class Server {
   constructor(
     private io: SocketIoServer,
     private auth: Auth,
-  ) {}
+  ) { }
 
   public async registerSystem<J, L>(system: System<J, L>) {
     this.systems.push(system);
@@ -84,7 +86,7 @@ export default class Server {
         return;
       }
 
-      socket.on('join-room', async ({ roomId }: RoomMessage, callback) => {
+      socket.on('join-room', async ({ roomId }: RoomMessage, callback?: RoomMessageCallback) => {
         const client = this.clients[socket.id];
         const room = await this.getRoom(roomId);
         const response = await room.addClient(client);
@@ -93,7 +95,7 @@ export default class Server {
         }
       });
 
-      socket.on('leave-room', async ({ roomId }: RoomMessage, callback) => {
+      socket.on('leave-room', async ({ roomId }: RoomMessage, callback: RoomMessageCallback) => {
         const client = this.clients[socket.id];
         const room = await this.getRoom(roomId);
         const response = await room.removeClient(client);

@@ -1,0 +1,17 @@
+classDiagram
+
+  class System~JoinResponse, LeaveResponse~ {
+    +id() string
+    +supportsRoom(Room room) boolean
+    +onAttach(Room room) Promise~void~
+    +onClientJoined(Room room, Client client) Promise~JoinResponse~
+    +onClientLeft(Room room, Client client) Promise~LeaveResponse~
+    +getEvents(Room room, Client client) Array~SystemEvent~
+  }
+  <<interface>> System
+
+  class SystemEvent~T extends[...any]~ {
+    +name string
+    + handler(T ...args) void
+  }
+  <<interface>> SystemEvent

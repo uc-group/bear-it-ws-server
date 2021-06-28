@@ -1,0 +1,47 @@
+sequenceDiagram
+
+  participant C as Socket.io Client
+  participant S as Socket
+  participant R as Room
+  participant RS as Room systems<br>(many)
+  participant Srv as Server Object
+  participant L as NewUserJoined listeners<br>(many)
+
+  C ->> +S: emits 'join-room' with roomID
+  S ->> +Srv: getClient(socket.id)
+  Srv -->> -S: returns client object
+  S ->> +Srv: getRoom(roomID)
+  opt room does not exist
+    Srv ->> R: <<create>> room roomID
+    
+    loop each supported system by room
+      Srv ->> RS: supportsRoom(room)
+      opt system is supported by room
+        Srv ->> R: attachSystem(system)
+      end
+    end
+  end
+  Srv -->> -S: returns room object
+  S ->> +R: addClient(client)
+  R ->> S: join socket room with roomID
+  opt first client of user in the room
+    loop each listener
+      R ->> +L: call listener (client.user)
+      deactivate L
+    end
+  end
+
+  loop each attached system
+    R ->> +RS: onClientJoined(room, client)
+    RS -->> -R: system state
+    R ->> +RS: getEvents(room, client)
+    RS -->> -R: returns system events
+    loop each event
+      R -) S: register event listener<br>for {roomID}/{event.name}
+    end
+  end
+
+  R -->> -S: returns room systems current state
+  S ->> -C: calls callback<br>with system current state
+
+
