@@ -1,7 +1,7 @@
 import { debounce } from 'lodash';
 import type Client from '../client/Client';
 import type Room from '../room/Room';
-import System from './System';
+import System, { SystemEvent } from './System';
 import * as Api from '../Api';
 
 interface JoinResponse {
@@ -33,7 +33,7 @@ export default class Chat implements System<JoinResponse, void> {
     return [
       {
         name: 'message',
-        handler: ({ content, id }: MessageMessage) => {
+        handler: ({ content, id }) => {
           const author = client.user.id;
           const postedAt = Date.now();
           const message = {
@@ -44,7 +44,7 @@ export default class Chat implements System<JoinResponse, void> {
           this.saveMessage(message);
           room.emit<[ChatMessage]>('message', message);
         },
-      },
+      } as SystemEvent<[MessageMessage]>,
     ];
   }
 
