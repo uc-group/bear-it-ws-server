@@ -25,6 +25,13 @@ sequenceDiagram
 
   R ->> S: leave socket room with roomID
 
+  opt last client in room
+    loop each system
+      R->>+RS: sleep()
+      deactivate RS
+    end
+  end
+
   opt last client of user in the room
     loop each listener
       R ->> +L: call listener (client.user)

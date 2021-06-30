@@ -23,8 +23,5 @@ module.exports = {
         config: require.resolve('./webpack.config.js'),
       },
     }
-  },
-  rules: {
-    'no-console': 'off'
   }
 }

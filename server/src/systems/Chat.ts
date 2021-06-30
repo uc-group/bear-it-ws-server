@@ -1,8 +1,10 @@
 import { debounce } from 'lodash';
+import axios, { CancelTokenSource } from 'axios';
 import type Client from '../client/Client';
 import type Room from '../room/Room';
 import System, { SystemEvent } from './System';
 import * as Api from '../Api';
+import SystemLogger from './SystemLogger';
 
 interface JoinResponse {
   users: string[],
@@ -27,7 +29,35 @@ export default class Chat implements System<JoinResponse, void> {
 
   private messageQueue: ChatMessage[] = [];
 
+  private cancelTokenSource?: CancelTokenSource = undefined;
+
+  private logger = new SystemLogger(this);
+
   constructor(private apiUrl: string) {}
+
+  async sleep(room: Room): Promise<void> {
+    this.logger.debug('sleep');
+    if (this.cancelTokenSource) {
+      this.logger.debug('aborted loading messages...');
+      this.cancelTokenSource.cancel();
+      this.cancelTokenSource = undefined;
+    }
+
+    if (Object.hasOwnProperty.call(this.messages, room.id)) {
+      delete this.messages[room.id];
+    }
+  }
+
+  async wakeup(room: Room): Promise<void> {
+    if (this.cancelTokenSource) {
+      this.logger.debug('aborted loading messages...');
+      this.cancelTokenSource.cancel();
+      this.cancelTokenSource = undefined;
+    }
+    this.logger.debug('Waking up chat system...');
+    await this.loadMessages(room);
+    this.logger.debug('messages loaded...');
+  }
 
   getEvents(room: Room, client: Client) {
     return [
@@ -48,6 +78,7 @@ export default class Chat implements System<JoinResponse, void> {
     ];
   }
 
+  // eslint-disable-next-line class-methods-use-this
   async onAttach(room: Room): Promise<void> {
     room.addListener('newUserJoined', () => {
       room.emit('user-list', room.getUserIds());
@@ -55,8 +86,6 @@ export default class Chat implements System<JoinResponse, void> {
     room.addListener('userLeft', () => {
       room.emit('user-list', room.getUserIds());
     });
-
-    await this.loadMessages(room);
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -80,11 +109,28 @@ export default class Chat implements System<JoinResponse, void> {
   async onClientLeft(): Promise<void> {}
 
   private async loadMessages(room: Room) {
-    try {
-      this.messages[room.id] = await Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${room.id}`) || [];
-    } catch (e) {
-      this.messages[room.id] = [];
-    }
+    this.logger.debug(`Loading messages for room ${room.id}...`);
+    this.messages[room.id] = await new Promise<ChatMessage[]>((resolve) => {
+      this.cancelTokenSource = axios.CancelToken.source();
+      Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${room.id}`, {
+        cancelToken: this.cancelTokenSource.token,
+      }).then((messages) => {
+        this.messages[room.id] = messages;
+        this.logger.debug(`Loaded ${messages.length} messages`);
+        this.cancelTokenSource = undefined;
+
+        resolve(messages);
+      }).catch((e) => {
+        if (axios.isCancel(e)) {
+          this.logger.debug('Cancelled loading messages');
+        } else {
+          this.logger.error(e);
+        }
+        this.cancelTokenSource = undefined;
+
+        resolve([]);
+      });
+    });
   }
 
   private saveMessage(message: ChatMessage) {

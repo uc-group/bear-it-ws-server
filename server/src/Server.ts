@@ -4,6 +4,7 @@ import Auth from './auth/Auth';
 import Client from './client/Client';
 import Room from './room/Room';
 import System from './systems/System';
+import logger from './logger';
 
 interface RoomMessage {
   roomId: string
@@ -36,11 +37,11 @@ export default class Server {
   public async getRoom(id: string) {
     const room = this.rooms.find((r) => r.id === id);
     if (!room) {
-      console.log(`Room ${id} not found. Creating.`);
+      logger.debug(`Room ${id} not found. Creating.`);
       const newRoom = new Room(id, this.io);
       const supportedSystems = this.systems.filter((system) => system.supportsRoom(newRoom));
       await Promise.all(supportedSystems.map((system) => newRoom.attachSystem(system)));
-      console.log(`System ${supportedSystems.map((system) => system.id()).join(', ')} attached to room ${id}`);
+      logger.debug(`System ${supportedSystems.map((system) => system.id()).join(', ')} attached to room ${id}`);
 
       this.rooms.push(newRoom);
       return newRoom;
@@ -72,16 +73,16 @@ export default class Server {
           delete this.clients[socket.id];
         }
 
-        console.log(`Client ${socket.id} disconnected`);
+        logger.debug(`Client ${socket.id} disconnected`);
       });
 
       try {
         const user = await this.auth.authenticate(token);
         const client = new Client(socket, user);
         this.clients[socket.id] = client;
-        console.log(`Client ${socket.id} authenticated as ${client.user.id}`);
+        logger.debug(`Client ${socket.id} authenticated as ${client.user.id}`);
       } catch (e) {
-        console.error(e);
+        logger.error(e);
         socket.disconnect();
         return;
       }
@@ -89,9 +90,17 @@ export default class Server {
       socket.on('join-room', async ({ roomId }: RoomMessage, callback?: RoomMessageCallback) => {
         const client = this.clients[socket.id];
         const room = await this.getRoom(roomId);
-        const response = await room.addClient(client);
-        if (typeof callback === 'function') {
-          callback(response);
+        try {
+          const response = await room.addClient(client);
+          if (typeof callback === 'function') {
+            callback(response);
+          }
+        } catch (e) {
+          if (e.isCancelled) {
+            logger.debug(e.message);
+          } else if (e.message) {
+            logger.error(e.message);
+          }
         }
       });
 

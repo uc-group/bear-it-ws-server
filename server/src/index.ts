@@ -5,6 +5,9 @@ import Server from './Server';
 import SimpleAuth from './auth/SimpleAuth';
 import Chat from './systems/Chat';
 import config from './config';
+import * as Logger from './logger';
+
+Logger.setLevel(process.env.NODE_ENV === 'production' ? 'error' : 'debug');
 
 const httpServer = createServer();
 const io = new SocketIoServer(httpServer, {
@@ -21,5 +24,6 @@ server.start();
 
 const port = config.port || 3000;
 httpServer.listen(port, () => {
+  // eslint-disable-next-line no-console
   console.log(`listening on *:${port}`);
 });

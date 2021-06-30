@@ -24,6 +24,12 @@ sequenceDiagram
   Srv -->> -S: returns room object
   S ->> +R: addClient(client)
   R ->> S: join socket room with roomID
+  opt first client in room
+    loop each system
+      R->>+RS: wakeup()
+      deactivate RS
+    end
+  end
   opt first client of user in the room
     loop each listener
       R ->> +L: call listener (client.user)
