@@ -4,19 +4,19 @@ import logger from '../logger';
 export default class SystemLogger {
   constructor(private system: System<any, any>) {}
 
-  public debug(...args: any[]) {
-    logger.debug(`[${this.system.id()}]`, ...args);
+  public debug(message: string, context?: string[], ...args: any[]) {
+    logger.debug(message, [this.system.id(), ...(context || [])], ...args);
   }
 
-  public info(...args: any[]) {
-    logger.info(`[${this.system.id()}]`, ...args);
+  public info(message: string, context?: string[], ...args: any[]) {
+    logger.info(message, [this.system.id(), ...(context || [])], ...args);
   }
 
-  public warn(...args: any[]) {
-    logger.warn(`[${this.system.id()}]`, ...args);
+  public warn(message: string, context?: string[], ...args: any[]) {
+    logger.warn(message, [this.system.id(), ...(context || [])], ...args);
   }
 
-  public error(...args: any[]) {
-    logger.error(`[${this.system.id()}]`, ...args);
+  public error(message: string, context?: string[], ...args: any[]) {
+    logger.error(message, [this.system.id(), ...(context || [])], ...args);
   }
 }

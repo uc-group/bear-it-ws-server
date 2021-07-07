@@ -29,18 +29,18 @@ export default class Chat implements System<JoinResponse, void> {
 
   private messageQueue: ChatMessage[] = [];
 
-  private cancelTokenSource?: CancelTokenSource = undefined;
+  private cancelTokenSource = new Map<string, CancelTokenSource>();
 
   private logger = new SystemLogger(this);
 
   constructor(private apiUrl: string) {}
 
   async sleep(room: Room): Promise<void> {
-    this.logger.debug('sleep');
-    if (this.cancelTokenSource) {
-      this.logger.debug('aborted loading messages...');
-      this.cancelTokenSource.cancel();
-      this.cancelTokenSource = undefined;
+    this.logger.debug('sleep', [room.id]);
+    if (this.cancelTokenSource.has(room.id)) {
+      this.logger.debug('aborted loading messages...', [room.id]);
+      this.cancelTokenSource.get(room.id)?.cancel();
+      this.cancelTokenSource.delete(room.id);
     }
 
     if (Object.hasOwnProperty.call(this.messages, room.id)) {
@@ -49,10 +49,10 @@ export default class Chat implements System<JoinResponse, void> {
   }
 
   async wakeup(room: Room): Promise<void> {
-    if (this.cancelTokenSource) {
+    if (this.cancelTokenSource.has(room.id)) {
       this.logger.debug('aborted loading messages...');
-      this.cancelTokenSource.cancel();
-      this.cancelTokenSource = undefined;
+      this.cancelTokenSource.get(room.id)?.cancel();
+      this.cancelTokenSource.delete(room.id);
     }
     this.logger.debug('Waking up chat system...');
     await this.loadMessages(room);
@@ -111,13 +111,13 @@ export default class Chat implements System<JoinResponse, void> {
   private async loadMessages(room: Room) {
     this.logger.debug(`Loading messages for room ${room.id}...`);
     this.messages[room.id] = await new Promise<ChatMessage[]>((resolve) => {
-      this.cancelTokenSource = axios.CancelToken.source();
+      this.cancelTokenSource.set(room.id, axios.CancelToken.source());
       Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${room.id}`, {
-        cancelToken: this.cancelTokenSource.token,
+        cancelToken: this.cancelTokenSource.get(room.id)?.token,
       }).then((messages) => {
         this.messages[room.id] = messages;
         this.logger.debug(`Loaded ${messages.length} messages`);
-        this.cancelTokenSource = undefined;
+        this.cancelTokenSource.delete(room.id);
 
         resolve(messages);
       }).catch((e) => {
@@ -126,7 +126,7 @@ export default class Chat implements System<JoinResponse, void> {
         } else {
           this.logger.error(e);
         }
-        this.cancelTokenSource = undefined;
+        this.cancelTokenSource.delete(room.id);
 
         resolve([]);
       });

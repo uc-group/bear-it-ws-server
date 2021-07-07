@@ -24,6 +24,8 @@ export default class Room {
 
   private systems: System<any, any>[] = [];
 
+  private wakeupPromise?: Promise<void>;
+
   private joiningClientCancelTokens = new Map<string, CancelToken>();
 
   private listeners: RoomListeners = {
@@ -37,13 +39,21 @@ export default class Room {
   ) {}
 
   public async addClient(client: Client): Promise<Record<string, any>> {
+    const loggerContext = ['room.addClient', this.id, client.socket.id];
+    logger.debug('adding client', loggerContext);
     if (this.isClientInRoom(client)) {
-      return {};
+      logger.debug(`client ${client.socket.id} already in room`, loggerContext);
+      if (!this.awake) {
+        await this.wakeup();
+      }
+
+      return this.onClientJoined(client);
     }
 
     return new Promise((resolve, reject) => {
       const cancelToken = new CancelToken(reject);
       this.joiningClientCancelTokens.set(client.socket.id, cancelToken);
+      logger.debug('cancel token created', loggerContext);
 
       (async () => {
         const usersBeforeJoin = this.getUsers();
@@ -63,17 +73,14 @@ export default class Room {
           this.listeners.newUserJoined.forEach((listener) => listener(client.user));
         }
 
-        const keys = this.systems.map((system) => system.id());
-        const promisses = this.systems.map((system) => system.onClientJoined(this, client));
-        const values = await Promise.all(promisses);
-        const result: Record<string, any> = {};
-        keys.forEach((key, index) => {
-          result[key] = values[index];
-        });
+        const result = await this.onClientJoined(client);
 
         this.systems.forEach((system) => {
           system.getEvents(this, client).forEach((event) => {
-            client.socket.on(`${this.id}/${event.name}`, event.handler);
+            const eventName = `${this.id}/${event.name}`;
+            if (!client.socket.listeners(eventName).length) {
+              client.socket.on(eventName, event.handler);
+            }
           });
         });
 
@@ -95,11 +102,11 @@ export default class Room {
   }
 
   public async removeClient(client: Client): Promise<Record<string, any>> {
+    const loggerContext = ['room.addClient', this.id, client.socket.id];
     this.joiningClientCancelTokens.get(client.socket.id)?.cancel(`Canceling client ${client.socket.id} joining room`);
 
     if (!this.isClientInRoom(client)) {
-      await this.sleep();
-
+      logger.debug('client not in room', loggerContext);
       return {};
     }
 
@@ -162,6 +169,22 @@ export default class Room {
     this.listeners[name].push(listener);
   }
 
+  public hasSystem(id: string): boolean {
+    return !!this.systems.find((s) => s.id() === id);
+  }
+
+  private async onClientJoined(client: Client): Promise<Record<string, any>> {
+    const keys = this.systems.map((system) => system.id());
+    const promisses = this.systems.map((system) => system.onClientJoined(this, client));
+    const values = await Promise.all(promisses);
+    const result: Record<string, any> = {};
+    keys.forEach((key, index) => {
+      result[key] = values[index];
+    });
+
+    return result;
+  }
+
   private async sleep(): Promise<void> {
     if (!this.awake) {
       return;
@@ -176,7 +199,17 @@ export default class Room {
       return;
     }
 
-    this.awake = true;
-    await Promise.all(this.systems.map((system) => system.wakeup(this)));
+    if (!this.wakeupPromise) {
+      logger.debug('waking up room', [this.id]);
+      this.wakeupPromise = Promise.all(
+        this.systems.map((system) => system.wakeup(this)),
+      ).then(() => {
+        this.wakeupPromise = undefined;
+        this.awake = true;
+        logger.debug('room woke up', [this.id]);
+      });
+    }
+
+    await this.wakeupPromise;
   }
 }

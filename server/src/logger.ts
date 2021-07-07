@@ -9,24 +9,24 @@ export const setLevel = (level: string) => {
 };
 
 export default {
-  debug(...args: any[]) {
+  debug(message: string, context?: string[], ...args: any[]) {
     if (currentLevel === 0) {
-      console.log(`[${now()}][debug]`, ...args);
+      console.log(`[${now()}][debug]${context ? `[${context.join(';')}]` : ''}`, message, ...args);
     }
   },
-  info(...args: any[]) {
+  info(message: string, context?: string[], ...args: any[]) {
     if (currentLevel <= 1) {
-      console.log(`[${now()}][debug]`, ...args);
+      console.log(`[${now()}][debug]${context ? `[${context.join(';')}]` : ''}`, message, ...args);
     }
   },
-  warn(...args: any[]) {
+  warn(message: string, context?: string[], ...args: any[]) {
     if (currentLevel <= 2) {
-      console.warn(`[${now()}][debug]`, ...args);
+      console.warn(`[${now()}][debug]${context ? `[${context.join(';')}]` : ''}`, message, ...args);
     }
   },
-  error(...args: any[]) {
+  error(message: string, context?: string[], ...args: any[]) {
     if (currentLevel <= 3) {
-      console.error(`[${now()}][debug]`, ...args);
+      console.error(`[${now()}][debug]${context ? `[${context.join(';')}]` : ''}`, message, ...args);
     }
   },
 };
