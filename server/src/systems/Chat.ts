@@ -112,7 +112,7 @@ export default class Chat implements System<JoinResponse, void> {
     this.logger.debug(`Loading messages for room ${room.id}...`);
     this.messages[room.id] = await new Promise<ChatMessage[]>((resolve) => {
       this.cancelTokenSource.set(room.id, axios.CancelToken.source());
-      Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${room.id}`, {
+      Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${encodeURIComponent(room.id)}`, {
         cancelToken: this.cancelTokenSource.get(room.id)?.token,
       }).then((messages) => {
         this.messages[room.id] = messages;
