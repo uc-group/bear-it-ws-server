@@ -1,4 +1,5 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import restClient from './restClient';
 import logger from './logger';
 
 export default interface BearitSuccessResponse<T> {
@@ -24,7 +25,7 @@ export const handleError = (e: Error | AxiosError) => {
 };
 
 export const get = async <T>(url: string, config?: AxiosRequestConfig): Promise<T> => (
-  axios.get<BearitSuccessResponse<T>>(url, config).then((r) => r.data.data)
+  restClient.get<BearitSuccessResponse<T>>(url, config).then((r) => r.data.data)
     .catch((e) => {
       handleError(e);
       return Promise.reject(e);
@@ -36,7 +37,7 @@ export const post = async <T, K = any>(
   data: K,
   config?: AxiosRequestConfig,
 ): Promise<T> => (
-  axios.post<BearitSuccessResponse<T>>(url, data, config).then((r) => r.data.data)
+  restClient.post<BearitSuccessResponse<T>>(url, data, config).then((r) => r.data.data)
     .catch((e) => {
       handleError(e);
       return Promise.reject(e);
@@ -48,7 +49,7 @@ export const put = async <T, K = any>(
   data: K,
   config?: AxiosRequestConfig,
 ): Promise<T> => (
-  axios.put<BearitSuccessResponse<T>>(url, data, config).then((r) => r.data.data)
+  restClient.put<BearitSuccessResponse<T>>(url, data, config).then((r) => r.data.data)
     .catch((e) => {
       handleError(e);
       return Promise.reject(e);
@@ -56,7 +57,7 @@ export const put = async <T, K = any>(
 );
 
 export const doDelete = async <T>(url: string, config?: AxiosRequestConfig): Promise<T> => (
-  axios.delete<BearitSuccessResponse<T>>(url, config).then((r) => r.data.data)
+  restClient.delete<BearitSuccessResponse<T>>(url, config).then((r) => r.data.data)
     .catch((e) => {
       handleError(e);
       return Promise.reject(e);

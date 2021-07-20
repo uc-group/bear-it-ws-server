@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import { CancelToken } from 'axios';
 import type { ChatMessage } from './Chat';
 import * as Api from '../Api';
@@ -10,17 +11,15 @@ export interface ChatApi {
 }
 
 export default class RestApi implements ChatApi {
-  constructor(private apiUrl: string) {}
-
   removeMessage(author: string, id: string): Promise<void> {
-    return Api.post(`${this.apiUrl}/chat/remove-message`, {
+    return Api.post('chat/remove-message', {
       id,
       author,
     });
   }
 
   editMessage(author: string, id: string, content: string): Promise<ChatMessage> {
-    return Api.put(`${this.apiUrl}/chat/message`, {
+    return Api.put('chat/message', {
       content,
       id,
       author,
@@ -28,11 +27,11 @@ export default class RestApi implements ChatApi {
   }
 
   pushMessages(messages: ChatMessage[]): Promise<void> {
-    return Api.post(`${this.apiUrl}/chat/messages`, messages);
+    return Api.post('chat/messages', messages);
   }
 
   loadMessages(roomId: string, cancelToken?: CancelToken): Promise<ChatMessage[]> {
-    return Api.get(`${this.apiUrl}/chat/messages?room=${encodeURIComponent(roomId)}`, {
+    return Api.get(`chat/messages?room=${encodeURIComponent(roomId)}`, {
       cancelToken,
     });
   }

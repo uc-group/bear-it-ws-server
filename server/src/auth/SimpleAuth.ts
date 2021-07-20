@@ -1,6 +1,7 @@
-import axios from 'axios';
 import User from '../client/User';
 import Auth from './Auth';
+import restClient from '../restClient';
+import { handleError } from '../Api';
 
 interface BearitSuccessResponse<T> {
   status: 'OK',
@@ -13,13 +14,17 @@ interface TokenResponse {
 }
 
 export default class SimpleAuth implements Auth {
-  constructor(private baseUrl: string) {}
-
+  // eslint-disable-next-line class-methods-use-this
   async authenticate(token: string): Promise<User> {
-    const connectedUser = await axios.get<BearitSuccessResponse<TokenResponse>>(`${this.baseUrl}/api/user-from-token?token=${token}`)
-      .then((response) => response.data)
-      .then((data) => data.data);
+    try {
+      const connectedUser = await restClient.get<BearitSuccessResponse<TokenResponse>>(`user-from-token?token=${token}`)
+        .then((response) => response.data)
+        .then((data) => data.data);
 
-    return new User(connectedUser.id);
+      return new User(connectedUser.id);
+    } catch (e) {
+      handleError(e);
+      throw e;
+    }
   }
 }

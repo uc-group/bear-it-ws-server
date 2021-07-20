@@ -5,7 +5,7 @@ import Server from './Server';
 import SimpleAuth from './auth/SimpleAuth';
 import Chat from './systems/Chat';
 import config from './config';
-import * as Logger from './logger';
+import logger, * as Logger from './logger';
 import RestApi from './systems/ChatApi';
 
 Logger.setLevel(process.env.NODE_ENV === 'production' ? 'error' : 'debug');
@@ -18,13 +18,13 @@ const io = new SocketIoServer(httpServer, {
   },
 });
 
-const server = new Server(io, new SimpleAuth(config.bearitUrl));
-server.registerSystem(new Chat(new RestApi(`${config.bearitUrl}/api`)));
+const server = new Server(io, new SimpleAuth());
+server.registerSystem(new Chat(new RestApi()));
 
 server.start();
 
 const port = config.port || 3000;
 httpServer.listen(port, () => {
   // eslint-disable-next-line no-console
-  console.log(`listening on *:${port}`);
+  logger.info(`listening on *:${port}`);
 });
