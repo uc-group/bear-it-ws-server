@@ -2,13 +2,11 @@ import { createServer } from 'http';
 import { AddressInfo } from 'net';
 import { Server, Socket } from 'socket.io';
 import { io as IOClient, Socket as ClientSocket } from 'socket.io-client';
-import Client from '../../client/Client';
-import User from '../../client/User';
-import { setLevel as loggerLevel } from '../../logger';
-import System from '../../systems/System';
-import Room from '../Room';
-
-// import Room from '../Room';
+import Client from '../src/client/Client';
+import User from '../src/client/User';
+import { setLevel as loggerLevel } from '../src/logger';
+import System from '../src/systems/System';
+import Room from '../src/room/Room';
 
 describe('room connecting', () => {
   let io: Server;

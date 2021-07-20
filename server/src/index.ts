@@ -6,6 +6,7 @@ import SimpleAuth from './auth/SimpleAuth';
 import Chat from './systems/Chat';
 import config from './config';
 import * as Logger from './logger';
+import RestApi from './systems/ChatApi';
 
 Logger.setLevel(process.env.NODE_ENV === 'production' ? 'error' : 'debug');
 
@@ -18,7 +19,7 @@ const io = new SocketIoServer(httpServer, {
 });
 
 const server = new Server(io, new SimpleAuth(config.bearitUrl));
-server.registerSystem(new Chat(`${config.bearitUrl}/api`));
+server.registerSystem(new Chat(new RestApi(`${config.bearitUrl}/api`)));
 
 server.start();
 

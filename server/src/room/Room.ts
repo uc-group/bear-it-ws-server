@@ -17,7 +17,15 @@ type RoomListeners = {
   userLeft: UserListener[]
 };
 
-export default class Room {
+export interface IRoom {
+  id: string,
+  emit: <T extends any[]>(eventName: string, ...args: T) => void,
+  getUsers: () => Readonly<User>[]
+  getUserIds: () => string[]
+  addListener: <T extends keyof Listeners>(name: T, listener: Listeners[T]) => void
+}
+
+export default class Room implements IRoom {
   private clients: Client[] = [];
 
   private awake: boolean = false;
@@ -145,7 +153,7 @@ export default class Room {
     return !!this.clients.find((m) => m.socket.id === client.socket.id);
   }
 
-  public getUsers(): readonly User[] {
+  public getUsers(): Readonly<User>[] {
     const users: User[] = [];
     this.clients.forEach((c) => {
       const user = users.find((u) => u.equals(c.user));

@@ -9,7 +9,10 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "__mocks__/**/*.ts",
+    "shims.d.ts"
   ],
   "exclude": [
     "node_modules"

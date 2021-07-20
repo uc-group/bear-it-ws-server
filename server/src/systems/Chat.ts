@@ -1,28 +1,31 @@
-import { debounce } from 'lodash';
+import { debounce, DebouncedFunc } from 'lodash';
 import axios, { CancelTokenSource } from 'axios';
-import type Client from '../client/Client';
-import type Room from '../room/Room';
+import type { IRoom } from '../room/Room';
 import System, { SystemEvent } from './System';
-import * as Api from '../Api';
 import SystemLogger from './SystemLogger';
+import type { ChatApi } from './ChatApi';
+import type { IClient } from '../client/Client';
 
 interface JoinResponse {
-  users: string[],
   messages: ChatMessage[]
 }
 
-interface MessageMessage {
+export interface MessageMessage {
   content: string,
   id: string
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string,
   postedAt: number,
   content: string,
   author: string,
   room: string,
 }
+
+export type ChatSystemOptions = {
+  flushQueueDelay: number
+};
 
 export default class Chat implements System<JoinResponse, void> {
   private messages: Record<string, ChatMessage[]> = {};
@@ -33,9 +36,15 @@ export default class Chat implements System<JoinResponse, void> {
 
   private logger = new SystemLogger(this);
 
-  constructor(private apiUrl: string) {}
+  public options: ChatSystemOptions = {
+    flushQueueDelay: 1000,
+  };
 
-  async sleep(room: Room): Promise<void> {
+  constructor(private api: ChatApi, options: Partial<ChatSystemOptions> = {}) {
+    this.options = { ...this.options, ...options };
+  }
+
+  async sleep(room: IRoom): Promise<void> {
     this.logger.debug('sleep', [room.id]);
     if (this.cancelTokenSource.has(room.id)) {
       this.logger.debug('aborted loading messages...', [room.id]);
@@ -46,9 +55,13 @@ export default class Chat implements System<JoinResponse, void> {
     if (Object.hasOwnProperty.call(this.messages, room.id)) {
       delete this.messages[room.id];
     }
+
+    if (this.debouncedFlushQueue) {
+      await this.debouncedFlushQueue.flush();
+    }
   }
 
-  async wakeup(room: Room): Promise<void> {
+  async wakeup(room: IRoom): Promise<void> {
     if (this.cancelTokenSource.has(room.id)) {
       this.logger.debug('aborted loading messages...');
       this.cancelTokenSource.get(room.id)?.cancel();
@@ -59,11 +72,11 @@ export default class Chat implements System<JoinResponse, void> {
     this.logger.debug('messages loaded...');
   }
 
-  getEvents(room: Room, client: Client) {
+  getEvents(room: IRoom, client: IClient) {
     return [
       {
         name: 'message',
-        handler: ({ content, id }) => {
+        handler: ({ content, id }, callback?: () => void) => {
           const author = client.user.id;
           const postedAt = Date.now();
           const message = {
@@ -73,13 +86,45 @@ export default class Chat implements System<JoinResponse, void> {
           this.messages[room.id].push(message);
           this.saveMessage(message);
           room.emit<[ChatMessage]>('message', message);
+          if (callback) {
+            callback();
+          }
         },
       } as SystemEvent<[MessageMessage]>,
+      {
+        name: 'edit-message',
+        handler: async ({ content, id }, callback?: (message: ChatMessage) => void) => {
+          const author = client.user.id;
+          const message = await this.api.editMessage(author, id, content);
+          const index = this.messages[room.id]?.findIndex((m) => m.id === message.id);
+          if (index !== -1 && index !== undefined) {
+            this.messages[room.id].splice(index, 1, message);
+          }
+          room.emit<[ChatMessage]>('message-updated', message);
+          if (callback) {
+            callback(message);
+          }
+        },
+      } as SystemEvent<[MessageMessage]>,
+      {
+        name: 'remove-message',
+        handler: async (id, callback?: () => void) => {
+          await this.api.removeMessage(id);
+          room.emit<[string]>('message-removed', id);
+          const index = this.messages[room.id]?.findIndex((m) => m.id === id);
+          if (index !== -1 && index !== undefined) {
+            this.messages[room.id].splice(index, 1);
+          }
+          if (callback) {
+            callback();
+          }
+        },
+      } as SystemEvent<[string]>,
     ];
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async onAttach(room: Room): Promise<void> {
+  async onAttach(room: IRoom): Promise<void> {
     room.addListener('newUserJoined', () => {
       room.emit('user-list', room.getUserIds());
     });
@@ -94,27 +139,27 @@ export default class Chat implements System<JoinResponse, void> {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  supportsRoom(room: Room): boolean {
+  supportsRoom(room: IRoom): boolean {
     return /^chat\//.test(room.id);
   }
 
-  async onClientJoined(room: Room): Promise<JoinResponse> {
-    return {
-      users: room.getUserIds(),
+  onClientJoined(room: IRoom): Promise<JoinResponse> {
+    return Promise.resolve({
       messages: this.messages[room.id] || [],
-    };
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function, class-methods-use-this
   async onClientLeft(): Promise<void> {}
 
-  private async loadMessages(room: Room) {
+  private async loadMessages(room: IRoom) {
     this.logger.debug(`Loading messages for room ${room.id}...`);
     this.messages[room.id] = await new Promise<ChatMessage[]>((resolve) => {
       this.cancelTokenSource.set(room.id, axios.CancelToken.source());
-      Api.get<ChatMessage[]>(`${this.apiUrl}/chat/messages?room=${encodeURIComponent(room.id)}`, {
-        cancelToken: this.cancelTokenSource.get(room.id)?.token,
-      }).then((messages) => {
+      this.api.loadMessages(
+        room.id,
+        this.cancelTokenSource.get(room.id)?.token,
+      ).then((messages) => {
         this.messages[room.id] = messages;
         this.logger.debug(`Loaded ${messages.length} messages`);
         this.cancelTokenSource.delete(room.id);
@@ -138,18 +183,27 @@ export default class Chat implements System<JoinResponse, void> {
     this.flushQueue();
   }
 
-  private flushQueue = debounce(async () => {
-    const data = JSON.parse(JSON.stringify(this.messageQueue)) as ChatMessage[];
-    this.messageQueue = [];
+  public debouncedFlushQueue: (DebouncedFunc<() => Promise<void>>) | undefined = undefined;
 
-    if (data.length === 0) {
-      return;
+  private flushQueue = () => {
+    if (!this.debouncedFlushQueue) {
+      this.debouncedFlushQueue = debounce(async () => {
+        const data = JSON.parse(JSON.stringify(this.messageQueue)) as ChatMessage[];
+        this.messageQueue = [];
+
+        if (data.length === 0) {
+          return;
+        }
+
+        try {
+          await this.api.pushMessages(data);
+        } catch (e) {
+          this.messageQueue = [...data, ...this.messageQueue];
+        }
+        this.debouncedFlushQueue = undefined;
+      }, this.options.flushQueueDelay);
     }
 
-    try {
-      await Api.post(`${this.apiUrl}/chat/messages`, data);
-    } catch (e) {
-      this.messageQueue = [...data, ...this.messageQueue];
-    }
-  }, 1000);
+    this.debouncedFlushQueue();
+  };
 }
