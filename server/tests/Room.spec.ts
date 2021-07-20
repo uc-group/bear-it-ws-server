@@ -134,6 +134,19 @@ describe('room connecting', () => {
     expect(wakeup.mock.calls.length).toBe(1);
   });
 
+  test('returns users connected to the room', async () => {
+    const room = new Room('test', io);
+    const client1 = new Client(serverSocket, new User('testuser'));
+    await newClientConnection();
+    const client2 = new Client(serverSocket, new User('seconduser'));
+    expect(client1.socket.id).not.toBe(client2.socket.id);
+
+    let response = await room.addClient(client1);
+    expect(response).toStrictEqual({ users: [client1.user.id] });
+    response = await room.addClient(client2);
+    expect(response).toStrictEqual({ users: [client1.user.id, client2.user.id] });
+  });
+
   test('returns systems data built on wakeup (two clients connect simultaneously)', async () => {
     type OnJoinResponse = { a: number, b:number };
     const system: { someData: OnJoinResponse | null } & System<OnJoinResponse | null> = {
@@ -173,7 +186,7 @@ describe('room connecting', () => {
       room.addClient(client2),
     ]);
 
-    expect(responses[0]).toStrictEqual({ 'test-system': { a: 1, b: 2 } });
-    expect(responses[1]).toStrictEqual({ 'test-system': { a: 1, b: 2 } });
+    expect(responses[0]['test-system']).toStrictEqual({ a: 1, b: 2 });
+    expect(responses[1]['test-system']).toStrictEqual({ a: 1, b: 2 });
   });
 });

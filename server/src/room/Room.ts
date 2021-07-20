@@ -190,6 +190,8 @@ export default class Room implements IRoom {
       result[key] = values[index];
     });
 
+    result.users = this.getUserIds();
+
     return result;
   }
 
