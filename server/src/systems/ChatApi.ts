@@ -6,18 +6,21 @@ export interface ChatApi {
   editMessage(author: string, id: string, content: string): Promise<ChatMessage>
   pushMessages(messages: ChatMessage[]): Promise<void>
   loadMessages(roomId: string, cancelToken?: CancelToken): Promise<ChatMessage[]>
-  removeMessage(id: string): Promise<void>
+  removeMessage(author: string, id: string): Promise<void>
 }
 
 export default class RestApi implements ChatApi {
   constructor(private apiUrl: string) {}
 
-  removeMessage(id: string): Promise<void> {
-    return Api.doDelete(`${this.apiUrl}/api/chat/message/${id}`);
+  removeMessage(author: string, id: string): Promise<void> {
+    return Api.post(`${this.apiUrl}/chat/remove-message`, {
+      id,
+      author,
+    });
   }
 
   editMessage(author: string, id: string, content: string): Promise<ChatMessage> {
-    return Api.put(`${this.apiUrl}/api/chat/message`, {
+    return Api.put(`${this.apiUrl}/chat/message`, {
       content,
       id,
       author,

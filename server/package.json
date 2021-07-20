@@ -15,8 +15,10 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.21.1",
+    "chalk": "^4.1.1",
     "lodash": "^4.17.21",
-    "socket.io": "^4.1.2"
+    "socket.io": "^4.1.2",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@babel/core": "^7.14.6",
@@ -26,6 +28,7 @@
     "@types/jest": "^26.0.24",
     "@types/lodash": "^4.14.170",
     "@types/node": "^15.12.4",
+    "@types/uuid": "^8.3.1",
     "@typescript-eslint/eslint-plugin": "^4.28.0",
     "babel-loader": "^8.2.2",
     "eslint": "^7.29.0",

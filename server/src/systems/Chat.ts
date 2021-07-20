@@ -1,5 +1,6 @@
 import { debounce, DebouncedFunc } from 'lodash';
 import axios, { CancelTokenSource } from 'axios';
+import { v4 as uuid4 } from 'uuid';
 import type { IRoom } from '../room/Room';
 import System, { SystemEvent } from './System';
 import SystemLogger from './SystemLogger';
@@ -80,7 +81,7 @@ export default class Chat implements System<JoinResponse, void> {
           const author = client.user.id;
           const postedAt = Date.now();
           const message = {
-            content, id, author, postedAt, room: room.id,
+            content, id: id || uuid4(), author, postedAt, room: room.id,
           } as ChatMessage;
 
           this.messages[room.id].push(message);
@@ -96,6 +97,7 @@ export default class Chat implements System<JoinResponse, void> {
         handler: async ({ content, id }, callback?: (message: ChatMessage) => void) => {
           const author = client.user.id;
           const message = await this.api.editMessage(author, id, content);
+
           const index = this.messages[room.id]?.findIndex((m) => m.id === message.id);
           if (index !== -1 && index !== undefined) {
             this.messages[room.id].splice(index, 1, message);
@@ -109,7 +111,8 @@ export default class Chat implements System<JoinResponse, void> {
       {
         name: 'remove-message',
         handler: async (id, callback?: () => void) => {
-          await this.api.removeMessage(id);
+          const author = client.user.id;
+          await this.api.removeMessage(author, id);
           room.emit<[string]>('message-removed', id);
           const index = this.messages[room.id]?.findIndex((m) => m.id === id);
           if (index !== -1 && index !== undefined) {

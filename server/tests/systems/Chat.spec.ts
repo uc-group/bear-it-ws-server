@@ -272,7 +272,8 @@ describe('Chat system', () => {
       const apiRemoveMessageMock = apiMock.removeMessage as jest.Mock<Promise<void>>;
       await handler('messageID');
       expect(apiRemoveMessageMock.mock.calls.length).toBe(1);
-      expect(apiRemoveMessageMock.mock.calls[0][0]).toBe('messageID');
+      expect(apiRemoveMessageMock.mock.calls[0][0]).toBe('testuser');
+      expect(apiRemoveMessageMock.mock.calls[0][1]).toBe('messageID');
     });
 
     test('is broadcasted to room members', async () => {

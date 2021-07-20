@@ -19,4 +19,9 @@ export default class SystemLogger {
   public error(message: string, context?: string[], ...args: any[]) {
     logger.error(message, [this.system.id(), ...(context || [])], ...args);
   }
+
+  public errorWithTrace(message: string, context?: string[], ...args: any[]) {
+    logger.error(message, [this.system.id(), ...(context || [])], ...args);
+    logger.trace();
+  }
 }
