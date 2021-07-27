@@ -116,4 +116,9 @@ export default class Server {
       socket.emit('connection-ready');
     });
   }
+
+  public async notifyRoom(roomId: string, event: string, ...message: any[]) {
+    const room = await this.getRoom(roomId);
+    room.emit(event, ...message);
+  }
 }

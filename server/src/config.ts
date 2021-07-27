@@ -1,12 +1,17 @@
 import { readFileSync } from 'fs';
 import logger from './logger';
 
+type Credentials = {
+  [username: string]: string
+};
+
 type Config = {
   bearitUrl: string,
   bearitPublicUrl: string,
   bearitUsername: string,
   bearitPassword: string,
-  port?: string
+  port?: string,
+  authUsers: Credentials
 };
 
 const defaultConfig = {
@@ -14,6 +19,7 @@ const defaultConfig = {
   bearitPublicUrl: 'http://localhost',
   bearitUsername: 'ws',
   bearitPassword: '',
+  authUsers: {},
 } as Config;
 
 let config: Config = { ...defaultConfig };

@@ -170,6 +170,7 @@ export default class Room implements IRoom {
   }
 
   public emit<T extends any[]>(eventName: string, ...args: T) {
+    logger.debug(`emitting event "${this.id}/${eventName}"`, args);
     this.io.to(this.id).emit(`${this.id}/${eventName}`, ...args);
   }
 
