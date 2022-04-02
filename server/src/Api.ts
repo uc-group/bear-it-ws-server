@@ -11,16 +11,15 @@ export const handleError = (e: Error | AxiosError) => {
   if (Object.prototype.hasOwnProperty.call(e, 'response')) {
     const response = (e as AxiosError).response as AxiosResponse;
     logger.error(e.message, [
-      response.config.method || '',
-      `${response.status}`,
-      response.statusText,
-      response.config.baseURL || '',
+      response?.config?.method || '',
+      `${response?.status}`,
+      response?.statusText,
+      response?.config?.baseURL || '',
     ]);
-    logger.info(JSON.stringify(response.config, null, 4));
-    logger.debug(JSON.stringify(response.data, null, 4));
+    logger.info(JSON.stringify(response?.config, null, 4));
+    logger.debug(JSON.stringify(response?.data, null, 4));
   } else {
     logger.error(e.message);
-    logger.trace();
   }
 };
 

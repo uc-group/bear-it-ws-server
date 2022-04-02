@@ -20,7 +20,9 @@ export default class SimpleAuth implements Auth {
       const connectedUser = await restClient.get<BearitSuccessResponse<TokenResponse>>(`user-from-token?token=${token}`)
         .then((response) => response.data)
         .then((data) => data.data);
-
+      if (!connectedUser) {
+        throw new Error('User not found');
+      }
       return new User(connectedUser.id);
     } catch (e) {
       handleError(e);
